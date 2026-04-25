@@ -4,38 +4,11 @@ import { useToken } from '../context/TokenContext'
 import { getLeaderboard } from '../api'
 import { useApi } from '../hooks/useApi'
 import { formatGrams, formatDate } from '../utils/format'
+import { isSeasonEnded, isBeforeSeasonStart, seasonDaysLeft, seasonProgress } from '../utils/season'
 import StatsCard from '../components/StatsCard'
 import LeaderboardCard from '../components/LeaderboardCard'
 import Toast from '../components/Toast'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
-
-function isSeasonEnded(season) {
-  if (!season) return false
-  return new Date(season.endDate) < new Date(new Date().toISOString().split('T')[0])
-}
-
-function isBeforeSeasonStart(season) {
-  if (!season) return false
-  return new Date(season.startDate) > new Date(new Date().toISOString().split('T')[0])
-}
-
-function seasonDaysLeft(season) {
-  if (!season) return 0
-  const now = new Date(new Date().toISOString().split('T')[0])
-  const end = new Date(season.endDate)
-  const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
-  return Math.max(0, diff)
-}
-
-function seasonProgress(season) {
-  if (!season) return 0
-  const start = new Date(season.startDate)
-  const end = new Date(season.endDate)
-  const now = new Date(new Date().toISOString().split('T')[0])
-  const total = end - start
-  const elapsed = now - start
-  return Math.min(1, Math.max(0, elapsed / total))
-}
 
 function getMiniLeaderboard(leaderboard, currentGroupId) {
   if (!leaderboard || leaderboard.length === 0) return []
@@ -83,7 +56,6 @@ export default function GroupHome() {
   const hasPurchases = stats && stats.purchaseCount > 0
 
   const miniLb = getMiniLeaderboard(lbData?.leaderboard, lbData?.currentGroupId)
-  const currentEntry = lbData?.leaderboard?.find((e) => e.groupId === lbData.currentGroupId)
 
   if (ctxLoading) {
     return (

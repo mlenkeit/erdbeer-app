@@ -26,6 +26,7 @@ export function useApi(fetchFn) {
 
   useEffect(() => {
     mountedRef.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch on mount is intentional
     refetch()
     return () => {
       mountedRef.current = false

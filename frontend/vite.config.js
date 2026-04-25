@@ -2,8 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { injectManifest } from 'workbox-build'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { build as rollupBuild } from 'vite'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 function workboxPlugin() {
   return {
@@ -39,7 +42,7 @@ function workboxPlugin() {
       })
 
       const { unlinkSync } = await import('fs')
-      try { unlinkSync(resolve(__dirname, 'dist/sw-raw.js')) } catch {}
+      try { unlinkSync(resolve(__dirname, 'dist/sw-raw.js')) } catch { /* cleanup is best-effort */ }
     },
   }
 }

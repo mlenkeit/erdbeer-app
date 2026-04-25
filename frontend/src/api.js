@@ -26,7 +26,6 @@ async function request(method, path, body) {
   try {
     response = await fetch(`${BASE_URL}${path}`, options)
   } catch (err) {
-    clearTimeout(timeout)
     if (err.name === 'AbortError') {
       throw new ApiError('TIMEOUT', 'Keine Verbindung zum Server. Bitte versuche es erneut.')
     }

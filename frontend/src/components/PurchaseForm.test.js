@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parsePriceToCents, PRICE_PATTERN } from './PurchaseForm'
+import { parsePriceToCents, PRICE_PATTERN } from '../utils/price'
 
 describe('parsePriceToCents', () => {
   it('converts comma decimal to cents', () => {

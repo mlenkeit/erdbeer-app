@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useToken } from '../context/TokenContext'
+import { isSeasonEnded } from '../utils/season'
 
 function HouseIcon({ className }) {
   return (
@@ -43,11 +44,6 @@ function TrophyIcon({ className }) {
       <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
     </svg>
   )
-}
-
-function isSeasonEnded(season) {
-  if (!season) return false
-  return new Date(season.endDate) < new Date(new Date().toISOString().split('T')[0])
 }
 
 export default function Layout() {

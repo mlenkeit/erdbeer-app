@@ -20,7 +20,7 @@ Build a mobile-first PWA for the Erdbeer App — a strawberry purchase tracker w
 | Routing | React Router v7 | Client-side routing for SPA, layout routes, error boundaries |
 | HTTP | `fetch` | No axios — keep dependencies minimal |
 | Language | German | All UI text hardcoded (no i18n library) |
-| PWA | vite-plugin-pwa | Manifest, icons, installability. Configured for static-asset precaching only — no runtime caching, no navigation caching, never cache API responses or token-bearing URLs. |
+| PWA | vite-plugin-pwa | Manifest, icons, installability. Configured with `injectManifest` mode for static-asset precaching only — no runtime caching, no navigation caching, never cache API responses or token-bearing URLs. The service worker must never store, cache, or log any URL containing the invite token. |
 | Font | System font stack | Tailwind default `font-sans` (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, ...`) — native feel, zero loading cost |
 
 ## 3. API Contract
@@ -31,7 +31,7 @@ The frontend consumes the backend API documented in SPEC-BACKEND.md. Key points:
 - **Auth:** Invite token passed as a URL path segment in every request. No cookies, no headers.
 - **Response envelope:** All successful responses wrap data in `{ "data": ... }`. Errors use `{ "error": { "code": "...", "message": "..." } }` with machine-readable codes and German messages.
 - **Content-Type:** All requests with a body must send `Content-Type: application/json`.
-- **Success status codes:** POST returns **201 Created** (not 200) with a `Location` header. GET/PUT/DELETE return 200. Use `response.ok` to check for success (covers both 200 and 201).
+- **Success status codes:** POST returns **201 Created** (not 200) with a `Location` header. GET/PUT return 200. DELETE returns **204 No Content** (no body). Use `response.ok` to check for success (covers 200, 201, and 204).
 - **Computed fields:** The backend computes `totalPriceCents`, `totalGrams`, `pricePerKgCents`, and `avgPricePerKgCents`. The frontend should always use backend-returned values and never compute these locally.
 
 ### API Client (`api.js`)
@@ -40,7 +40,7 @@ The API client module provides a consistent interface for all API calls:
 
 - Accepts the invite token and builds the full URL
 - Sets `Content-Type: application/json` on all POST/PUT requests
-- On success (2xx): unwraps the `{ "data": ... }` envelope and returns the inner data
+- On success (2xx): unwraps the `{ "data": ... }` envelope and returns the inner data. For 204 No Content (DELETE), returns `null`.
 - On error (4xx/5xx): throws a typed error object with `{ code, message }` from the error envelope
 - Sets a 15-second fetch timeout via `AbortController`
 
@@ -54,7 +54,7 @@ The API client module provides a consistent interface for all API calls:
 | POST | `/api/purchases/:token` | NewPurchase — create purchase |
 | GET | `/api/purchases/:token/:id` | EditPurchase — load existing purchase |
 | PUT | `/api/purchases/:token/:id` | EditPurchase — full replace (date + all items) |
-| DELETE | `/api/purchases/:token/:id` | EditPurchase — delete purchase |
+| DELETE | `/api/purchases/:token/:id` | EditPurchase — delete purchase (returns 204 No Content) |
 
 ### Key Data Formats
 
@@ -70,7 +70,8 @@ The API returns structured errors. The frontend should switch on `error.code` (n
 
 | Code | HTTP | Meaning |
 |------|------|---------|
-| `GROUP_NOT_FOUND` | 404 | Invalid or expired invite token |
+| `GROUP_NOT_FOUND` | 404 | Invalid invite token (no matching group) |
+| `SEASON_ENDED` | 403 | Token is valid but season has ended. Reads still work; writes are rejected. Show "Die Saison ist beendet!" banner and hide write CTAs. |
 | `PURCHASE_NOT_FOUND` | 404 | Purchase doesn't exist or doesn't belong to this group |
 | `VALIDATION_ERROR` | 400 | Request body fails validation |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Missing or wrong Content-Type header (should never occur if `api.js` is used correctly — falls through to generic error display) |
@@ -78,7 +79,7 @@ The API returns structured errors. The frontend should switch on `error.code` (n
 
 Display `error.message` to the user (it's already in German). Always render error messages as text content, never as raw HTML.
 
-**Backend dependency — season expiry:** The current backend rejects ALL requests (including reads) when the season ends, returning `GROUP_NOT_FOUND`. This means users lose access to their data the day after the season ends. The backend should be updated to either allow read-only access to ended seasons or return a distinct `SEASON_INACTIVE` error code. The frontend should handle both cases: display "Die Saison ist beendet!" with read-only data when possible, or a clear German message explaining the season has ended (not the misleading "Gruppe nicht gefunden").
+**Backend dependency — season expiry:** The backend allows read-only access (GET) to ended seasons but rejects write operations (POST/PUT/DELETE) with `SEASON_ENDED` (403). The frontend should check `error.code === 'SEASON_ENDED'` and display "Die Saison ist beendet!" with a banner, hide all write CTAs ("Einkauf erfassen", "Speichern", "Löschen"), and continue allowing navigation to history and leaderboard.
 
 ## 4. Routes
 
@@ -101,7 +102,7 @@ The invite token is the top-level path segment. `/:token` is a **layout route** 
 
 ### Error Boundaries
 
-- **Root level (`/:token`):** `GROUP_NOT_FOUND` renders a full-page error: "Ungültiger Einladungslink" — no navigation, since nothing can function without a valid token.
+- **Root level (`/:token`):** On initial mount, `GROUP_NOT_FOUND` renders a full-page error: "Ungültiger Einladungslink" — no navigation, since nothing can function without a valid token. On subsequent navigation failures (transient errors after initial load succeeded), show an inline error banner with "Nochmal versuchen" retry button — do NOT destroy child component state.
 - **Route level (`/:token/einkauf/:id`):** `PURCHASE_NOT_FOUND` navigates back to history with an error toast.
 - **Generic fallback:** `INTERNAL_ERROR` or unexpected errors render "Etwas ist schiefgelaufen" with a "Nochmal versuchen" retry button.
 
@@ -117,7 +118,7 @@ The invite token is the top-level path segment. `/:token` is a **layout route** 
 | Surface | `#FFFFFF` (white) | Cards, input backgrounds |
 | Text | `#1A1A1A` (near-black) | Body text |
 | Text Secondary | `#6B7280` (medium gray) | Labels, captions, secondary info |
-| Accent | `#FFB300` (gold/amber) | Rank #1 badge/trophy |
+| Accent | `#D48D00` (dark gold/amber) | Rank #1 badge/trophy — meets WCAG AA contrast (4.5:1 on white) |
 | Error | `#D32F2F` (deep red) | Error states, destructive actions (distinct from primary red) |
 
 Map to Tailwind config `extend.colors` for consistent usage.
@@ -150,10 +151,11 @@ Map to Tailwind config `extend.colors` for consistent usage.
 | Destructive button ("Löschen") | Red outline or red text — not filled, prevents accidental taps |
 | Form inputs | 48px min height, `rounded-lg`, light gray border, 16px font size (prevents iOS auto-zoom on focus) |
 | Bag size toggle | Segmented control — two large buttons side by side, selected state filled with primary color. NOT a dropdown. |
-| Price unit toggle | Segmented control — three buttons ("pro kg" / "pro 500g" / "pro 250g"). NOT a dropdown. |
-| Number stepper | -/+ buttons flanking a centered number, minimum 44x44px touch targets per button |
+| Price unit toggle | Segmented control — three buttons ("pro kg" / "pro 500g" / "pro 250g"). Ensure buttons are at least 44px tall with clear visual separation. On screens narrower than 360px, consider stacking vertically. NOT a dropdown. |
+| Number stepper | -/+ buttons flanking a centered number, minimum 44x44px touch targets per button. The centered number is tappable — tapping it focuses a numeric input for direct entry (faster for quantities >= 5). |
 | Cards | White background, `rounded-xl`, `shadow-sm`, 12-16px padding |
 | All interactive elements | Minimum 44x44px touch targets (iOS guideline) |
+| Accessibility baseline | Use semantic HTML (`<main>`, `<nav>`, `<button>`, `<label>`). Toast uses `role="alert"`. ConfirmDialog traps focus and handles Escape key. Form validation errors linked to inputs via `aria-describedby`. Invalid fields marked with `aria-invalid="true"`. Respect `prefers-reduced-motion` media query — disable transitions/animations when set. |
 
 ## 6. UI Screens
 
@@ -168,7 +170,7 @@ The landing page after tapping the invite link.
 2. **Welcome text (first visit / 0 purchases):** "Wer kauft die meisten Erdbeeren? Trag deinen Einkauf ein und finde es heraus!" — disappears once purchases exist
 3. **CTA hero:** "Einkauf erfassen" button — the most visually dominant element, strawberry-red, prominent
 4. **Stats row:** Three compact inline stats — total grams, number of purchases, average price per kg. Bold numbers with labels beneath.
-5. **Mini leaderboard:** Top 3 groups with totals and ranks, current group highlighted (strawberry-red accent). Gap to next group (e.g. "500g hinter Platz 2!"). See leaderboard edge cases below.
+5. **Mini leaderboard:** Show at most 3 rows. If the current group is in the top 3, show the top 3. If the current group is ranked lower, show the rank above, the current group, and the rank below (contextual view). Current group highlighted (strawberry-red accent) with "Ihr" badge. Gap to next group (e.g. "500g hinter Platz 2!"). See leaderboard edge cases below.
 6. **Season progress:** Thin progress bar with "noch X Tage" countdown
 7. **Links** to full "Rangliste" and "Verlauf"
 
@@ -177,6 +179,7 @@ The landing page after tapping the invite link.
 - `gapToNextGrams` is `0` (tied): show "Gleichauf auf Platz X!"
 - Only 1 group in season: show the group normally, omit gap metric
 - Less than 3 groups: show however many exist without looking broken
+- More than 3 groups tied for top ranks: show the first 3 alphabetically. Always include the current group's row even if outside the displayed ranks.
 - Gap text always refers to the next rank up (from API `gapToNextGrams`), NOT always rank 1
 
 **Empty state (0 purchases):**
@@ -200,15 +203,15 @@ The form must load group/season data (from `TokenContext`) before rendering, to 
 - **Was hast du gekauft?** (line items): repeatable section, 1 item shown by default
   - Beutelgröße (bag size): segmented control, 250g and 500g. Defaults to **500g** (most common German supermarket size).
   - Anzahl (quantity): number stepper, starts at 1. Uses `inputmode="numeric"`.
-  - Preis (price): text input with `inputmode="decimal"` (NOT `type="number"` — comma won't work). Shows "EUR" suffix. Accepts both comma and period as decimal separator. Converted to cents before API call via `Math.round(parseFloat(value.replace(',', '.')) * 100)`.
+  - Preis (price): text input with `inputmode="decimal"` (NOT `type="number"` — comma won't work). Note: on iOS Safari, `inputmode="decimal"` shows a period-based keypad, not a comma keypad — this is acceptable since the app accepts both comma and period as decimal separator. Shows "EUR" suffix. Accepts both comma and period as decimal separator. Validated with pattern `/^\d{1,3}([,.]\d{1,2})?$/`. Converted to cents before API call via `Math.round(parseFloat(value.replace(',', '.')) * 100)`.
   - Preis gilt für... (price unit): segmented control, "pro kg" / "pro 500g" / "pro 250g". Defaults to **"pro 500g"**.
-- **"+ Weitere Position"** button to add another line item (most purchases will be 1 item). Remove item via X button (hidden when only 1 item remains).
+- **"+ Weitere Position"** button to add another line item (most purchases will be 1 item). Remove item via X button (hidden when only 1 item remains). Maximum 20 line items per purchase — disable the button when 20 items are reached and show hint: "Maximal 20 Positionen pro Einkauf."
 - **"Speichern"** button — fixed to bottom of viewport (always thumb-reachable)
 
 **Optimized for the common case:** Buy 1 type of strawberry bag at the supermarket. With 500g and "pro 500g" as defaults, the user only needs to enter the price and tap save.
 
 **Form behavior:**
-- Auto-focus the price input field on load (the first field that needs user input, since date, bag size, and price unit all have sensible defaults)
+- Do NOT auto-focus the price input on mobile — opening the keyboard immediately can be jarring when users want to review the form first. On desktop, auto-focus is acceptable.
 - Inline validation: highlight invalid fields immediately with German error text (e.g. "Bitte einen gültigen Preis eingeben"). Disable "Speichern" until the form is valid.
 - On submit: disable the "Speichern" button and show a spinner (prevents double-submit on slow connections)
 - On success: navigate to GroupHome with success toast
@@ -250,14 +253,14 @@ Each row shows:
 - Single group in season: render normally, omit gap metric
 - Groups with 0 purchases: show "Noch keine Einkäufe" instead of "0 g"
 
-**Current group highlight:** Strawberry-red left border or tinted background (`bg-red-50`) with a "Du" badge.
+**Current group highlight:** Strawberry-red left border or tinted background (`bg-red-50`) with an "Ihr" badge (plural, since groups are families/couples).
 
 ## 7. Frontend Validation
 
 Validation is for UX — the backend is the source of truth.
 
-- Price input accepts both comma and period as decimal separator (German format: "3,99" or "3.99"), converted to cents before API call
-- Date defaults to today, cannot be set outside the season date range. Season dates are loaded from `TokenContext` (via the initial group fetch).
+- Price input accepts both comma and period as decimal separator (German format: "3,99" or "3.99"), validated with pattern `/^\d{1,3}([,.]\d{1,2})?$/` before conversion. Reject invalid formats (e.g. "3,99,99") with "Bitte einen gültigen Preis eingeben." Converted to cents before API call.
+- Date defaults to today, cannot be set outside the season date range (inclusive: `season.startDate <= date <= season.endDate`). Season dates are loaded from `TokenContext` (via the initial group fetch).
 - Bag size must be 250 or 500
 - Quantity must be a positive integer (1-99)
 - Price must be a positive number (0,01-999,99)
@@ -286,11 +289,12 @@ A `useApi(url)` custom hook provides a consistent pattern for all data fetching:
 - Each page fetches its own data via `useApi` on mount
 - After a mutation (create/edit/delete purchase), navigate back to GroupHome, which refetches on mount
 - No shared client-side cache — always refetch. The API targets < 200ms responses, so this is fast enough.
+- **Post-MVP enhancement:** A 30-second in-memory cache keyed by URL in `useApi` would make tab switching feel instant. Not a persistent cache — cleared on page reload and invalidated on any mutation.
 - Layout receives group name from `TokenContext` (seeded by the layout route's initial fetch)
 
 ### Form State
 
-The purchase form uses `useReducer` for managing the dynamic line items array:
+The purchase form can use either `useReducer` or `useState` for managing the dynamic line items array. `useReducer` is a good fit if the form grows more complex; `useState` with callbacks is simpler for the current scope:
 ```
 State: { date: string, items: [{ bagSizeGrams, quantity, priceDisplay, priceUnit }] }
 Actions: ADD_ITEM, REMOVE_ITEM, UPDATE_ITEM, SET_DATE, RESET
@@ -314,6 +318,7 @@ The bar is fixed to the bottom of the viewport with `env(safe-area-inset-bottom)
 ### Loading States
 
 - **Data screens** (GroupHome, History, Leaderboard): skeleton placeholders matching card/row layouts (gray pulsing rectangles). Not a centered spinner.
+- **Form screens** (NewPurchase, EditPurchase): show skeleton placeholder for the form area until TokenContext is loaded. Do not render form inputs before season dates are available (needed for date range validation).
 - **Form submissions:** "Speichern" button shows a spinner and is disabled. Form inputs remain visible but non-interactive.
 
 ### Error States
@@ -341,7 +346,7 @@ Toast auto-dismisses after 4 seconds.
 ### Season States
 
 - **Before season start:** "Die Saison startet am [date]" — hide the purchase CTA, show empty leaderboard/stats.
-- **After season end:** "Die Saison ist beendet!" banner — display final leaderboard and history as read-only, hide the purchase CTA and the "Erfassen" navigation tab.
+- **After season end:** "Die Saison ist beendet!" banner — display final leaderboard and history as read-only, hide the purchase CTA and the "Erfassen" navigation tab. The backend returns `SEASON_ENDED` (403) for any write attempt.
 
 ## 11. Project Structure
 
@@ -392,7 +397,7 @@ server: {
 }
 ```
 
-The `VITE_API_BASE_URL` environment variable (defaults to `/api`) configures the API base path in `api.js`.
+The `VITE_API_BASE_URL` environment variable (defaults to `/api`) configures the API base path in `api.js`. In production, set this to the full backend URL (e.g., `https://erdbeeren.example.com/api`) if the frontend is served from a different origin. The `/api` default only works when frontend and backend share the same origin.
 
 ### Deployment
 
@@ -432,7 +437,7 @@ Manifest fields (`manifest.json`):
 
 Required icon sizes: 192x192, 512x512, and a maskable variant.
 
-`vite-plugin-pwa` configuration: `generateSW` mode with `navigateFallback` for SPA routing. Precache static assets (JS, CSS, icons) only. Do NOT cache API responses or URLs containing the invite token.
+`vite-plugin-pwa` configuration: `injectManifest` mode with a custom service worker that ONLY precaches static assets (JS, CSS, icons). Use `NetworkOnly` strategy for all navigation requests — never intercept or cache `/:token` routes. Do NOT use `generateSW` with `navigateFallback`, as it would cache token-bearing navigation URLs. Do NOT cache API responses or URLs containing the invite token.
 
 **In-app browser note:** Invite links shared via WhatsApp/Signal/Telegram open in in-app browsers that don't support PWA install. Consider detecting in-app browsers and showing a banner: "Für das beste Erlebnis in deinem Browser öffnen" with instructions.
 
@@ -440,6 +445,7 @@ Required icon sizes: 192x192, 512x512, and a maskable variant.
 
 - Functional components with hooks
 - React Router v7 for routing (layout routes, error boundaries, `useParams`, `useNavigate`)
+- Use `React.lazy()` for route-level code splitting on `Leaderboard`, `History`, and `EditPurchase` pages to reduce initial bundle size
 - `fetch` for API calls (no axios)
 - German text hardcoded in components (no i18n library for a single-language app). Use everyday, informal language — not bureaucratic German.
 - Tailwind CSS for all styling — no custom CSS files unless necessary
@@ -461,7 +467,7 @@ Required icon sizes: 192x192, 512x512, and a maskable variant.
 - [ ] Editing a purchase pre-fills all fields correctly
 - [ ] Deleting a purchase shows confirmation dialog and removes it from history
 - [ ] Leaderboard shows all groups ranked by total grams
-- [ ] Current group is highlighted on the leaderboard with "Du" badge
+- [ ] Current group is highlighted on the leaderboard with "Ihr" badge
 - [ ] Rank 1 group shows "Platz 1!" badge, no gap text
 - [ ] Tied groups show "Gleichauf auf Platz X!"
 - [ ] Invalid invite token shows full-page German error ("Ungültiger Einladungslink")
@@ -475,6 +481,10 @@ Required icon sizes: 192x192, 512x512, and a maskable variant.
 - [ ] API errors show inline German error messages with retry option
 - [ ] Season ended state shows read-only data with "Saison beendet" banner
 - [ ] GroupHome with 0 purchases shows welcome message and CTA
+- [ ] "+" button disabled at 20 items with hint text "Maximal 20 Positionen pro Einkauf"
+- [ ] Price input rejects malformed values like "3,99,99" with validation error
+- [ ] Season ended state allows viewing history and leaderboard but hides write CTAs
+- [ ] Referrer-Policy header present on all pages (verified: no token in outgoing Referer)
 
 ## 14. Boundaries
 
@@ -519,4 +529,6 @@ These are acknowledged tradeoffs for MVP scope:
 - **No concurrent edit detection.** If two people edit the same purchase simultaneously, the last save wins. Acceptable for a family context.
 - **Token-in-URL exposure.** The invite token is visible in browser history, URL bar, and screenshots. Acceptable for a trust-based family app. Mitigated by `Referrer-Policy: no-referrer` and HTTPS-only deployment.
 - **No dark mode.** Use Tailwind semantic color tokens in `tailwind.config.js` so dark mode can be added later with `dark:` variants.
-- **No accessibility audit.** Basic accessibility is ensured via semantic HTML, 44px touch targets, and sufficient color contrast (WCAG AA). A full audit is post-MVP.
+- **Native date picker locale varies by device.** On non-German-configured devices, `<input type="date">` may show MM/DD/YYYY instead of DD.MM.YYYY. Acceptable for MVP since family members likely have German-locale devices.
+- **No accessibility audit.** Basic accessibility is ensured via semantic HTML, 44px touch targets, sufficient color contrast (WCAG AA), ARIA attributes on interactive components, and `prefers-reduced-motion` support. A full audit is post-MVP.
+- **Form state not persisted across page reloads.** Draft persistence via localStorage is a post-MVP enhancement.

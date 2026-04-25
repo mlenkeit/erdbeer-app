@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import { SegmentedControl, NumberStepper, PriceInput } from './FormInputs'
 import { CloseIcon } from './Icons'
-
-export const PRICE_PATTERN = /^\d{1,3}([,.]\d{1,2})?$/
-
-export function parsePriceToCents(value) {
-  const normalized = value.replace(',', '.')
-  return Math.round(parseFloat(normalized) * 100)
-}
+import { PRICE_PATTERN, parsePriceToCents } from '../utils/price'
 
 function createEmptyItem() {
   return {
@@ -18,15 +12,8 @@ function createEmptyItem() {
   }
 }
 
-function formatDateForInput(isoDate) {
-  return isoDate
-}
-
-function priceDisplayFromCents(cents, unit) {
-  const unitGrams = unit === 'kg' ? 1000 : unit === '500g' ? 500 : 250
-  const perUnit = cents * unitGrams / 1000
-  const euros = perUnit / 100
-  return euros.toFixed(2).replace('.', ',')
+function priceDisplayFromCents(cents) {
+  return (cents / 100).toFixed(2).replace('.', ',')
 }
 
 function initItems(initialData) {
@@ -34,7 +21,7 @@ function initItems(initialData) {
   return initialData.items.map((item) => ({
     bagSizeGrams: item.bagSizeGrams,
     quantity: item.quantity,
-    priceDisplay: priceDisplayFromCents(item.priceCents, item.priceUnit),
+    priceDisplay: priceDisplayFromCents(item.priceCents),
     priceUnit: item.priceUnit,
   }))
 }
