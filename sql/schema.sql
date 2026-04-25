@@ -1,4 +1,4 @@
-CREATE TABLE seasons (
+CREATE TABLE IF NOT EXISTS seasons (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     start_date DATE NOT NULL,
@@ -6,7 +6,7 @@ CREATE TABLE seasons (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `groups` (
+CREATE TABLE IF NOT EXISTS `groups` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     season_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE `groups` (
     FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE purchases (
+CREATE TABLE IF NOT EXISTS purchases (
     id INT AUTO_INCREMENT PRIMARY KEY,
     group_id INT NOT NULL,
     purchased_at DATE NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE purchases (
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE purchase_items (
+CREATE TABLE IF NOT EXISTS purchase_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     purchase_id INT NOT NULL,
     bag_size_grams INT NOT NULL,
