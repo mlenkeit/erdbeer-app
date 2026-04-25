@@ -55,6 +55,7 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
 header('Cache-Control: no-store');
 header('Strict-Transport-Security: max-age=31536000');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

@@ -20,7 +20,7 @@ function validateToken(PDO $pdo, string $token): array
     $stmt = $pdo->prepare('
         SELECT g.id AS group_id, g.name AS group_name, g.season_id,
                s.name AS season_name, s.start_date, s.end_date
-        FROM groups g
+        FROM `groups` g
         JOIN seasons s ON s.id = g.season_id
         WHERE g.invite_token = ?
     ');
@@ -36,9 +36,10 @@ function validateToken(PDO $pdo, string $token): array
 
 function isSeasonActive(array $group): bool
 {
-    $today = new DateTimeImmutable('today', new DateTimeZone('Europe/Berlin'));
-    $start = new DateTimeImmutable($group['start_date']);
-    $end = new DateTimeImmutable($group['end_date']);
+    $tz = new DateTimeZone('Europe/Berlin');
+    $today = new DateTimeImmutable('today', $tz);
+    $start = new DateTimeImmutable($group['start_date'], $tz);
+    $end = new DateTimeImmutable($group['end_date'], $tz);
 
     return $today >= $start && $today <= $end;
 }
@@ -50,9 +51,10 @@ function validatePurchaseDate(string $dateStr, array $group): string
         jsonError('VALIDATION_ERROR', 'Ungültiges Datum', 400);
     }
 
-    $start = new DateTimeImmutable($group['start_date']);
-    $end = new DateTimeImmutable($group['end_date']);
-    $dateIm = new DateTimeImmutable($dateStr);
+    $tz = new DateTimeZone('Europe/Berlin');
+    $start = new DateTimeImmutable($group['start_date'], $tz);
+    $end = new DateTimeImmutable($group['end_date'], $tz);
+    $dateIm = new DateTimeImmutable($dateStr, $tz);
 
     if ($dateIm < $start || $dateIm > $end) {
         jsonError('VALIDATION_ERROR', 'Datum muss innerhalb der Saison liegen', 400);
@@ -175,31 +177,46 @@ function checkRateLimit(string $token): void
         mkdir($dir, 0700, true);
     }
 
-    $file = $dir . '/' . $token;
+    $file = $dir . '/' . hash('sha256', $token);
     $window = 600;
     $limit = 100;
     $now = time();
 
+    $fp = fopen($file, 'c+');
+    if ($fp === false) {
+        return;
+    }
+
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        return;
+    }
+
+    $raw = stream_get_contents($fp);
     $entries = [];
-    if (file_exists($file)) {
-        $raw = file_get_contents($file);
-        if ($raw !== false) {
-            $entries = array_filter(
-                array_map('intval', explode("\n", trim($raw))),
-                fn(int $ts) => ($now - $ts) < $window
-            );
-        }
+    if ($raw !== false && $raw !== '') {
+        $entries = array_filter(
+            array_map('intval', explode("\n", trim($raw))),
+            fn(int $ts) => ($now - $ts) < $window
+        );
     }
 
     if (count($entries) >= $limit) {
         $oldest = min($entries);
         $retryAfter = $window - ($now - $oldest);
+        flock($fp, LOCK_UN);
+        fclose($fp);
         header("Retry-After: {$retryAfter}");
         jsonError('RATE_LIMITED', 'Zu viele Anfragen, bitte warte kurz', 429);
     }
 
     $entries[] = $now;
-    file_put_contents($file, implode("\n", $entries) . "\n", LOCK_EX);
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, implode("\n", $entries) . "\n");
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
 }
 
 function requireJsonContentType(): void

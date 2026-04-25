@@ -15,30 +15,29 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $stmt = $pdo->prepare('
-    SELECT p.id AS purchase_id,
-           pi.bag_size_grams, pi.quantity, pi.price_cents, pi.price_unit
-    FROM purchases p
-    JOIN purchase_items pi ON pi.purchase_id = p.id
-    WHERE p.group_id = ?
+    SELECT COUNT(DISTINCT p.id) AS purchase_count,
+           COALESCE(SUM(pi.bag_size_grams * pi.quantity), 0) AS total_grams,
+           COALESCE(SUM(
+               ROUND(pi.price_cents * pi.bag_size_grams / CASE pi.price_unit
+                   WHEN \'kg\' THEN 1000
+                   WHEN \'500g\' THEN 500
+                   WHEN \'250g\' THEN 250
+               END) * pi.quantity
+           ), 0) AS total_price_cents
+    FROM `groups` g
+    LEFT JOIN purchases p ON p.group_id = g.id
+    LEFT JOIN purchase_items pi ON pi.purchase_id = p.id
+    WHERE g.id = ?
 ');
 $stmt->execute([$group['group_id']]);
-$rows = $stmt->fetchAll();
+$row = $stmt->fetch();
 
-$purchases = [];
-foreach ($rows as $row) {
-    $pid = $row['purchase_id'];
-    if (!isset($purchases[$pid])) {
-        $purchases[$pid] = ['items' => []];
-    }
-    $purchases[$pid]['items'][] = [
-        'bagSizeGrams' => $row['bag_size_grams'],
-        'quantity' => $row['quantity'],
-        'priceCents' => $row['price_cents'],
-        'priceUnit' => $row['price_unit'],
-    ];
-}
-
-$stats = computeGroupStats(array_values($purchases));
+$totalGrams = (int) $row['total_grams'];
+$totalPriceCents = (int) $row['total_price_cents'];
+$purchaseCount = (int) $row['purchase_count'];
+$avgPricePerKgCents = $totalGrams > 0
+    ? (int) round($totalPriceCents * 1000 / $totalGrams)
+    : null;
 
 jsonResponse([
     'id' => (int) $group['group_id'],
@@ -49,7 +48,7 @@ jsonResponse([
         'startDate' => $group['start_date'],
         'endDate' => $group['end_date'],
     ],
-    'totalGrams' => $stats['totalGrams'],
-    'purchaseCount' => $stats['purchaseCount'],
-    'avgPricePerKgCents' => $stats['avgPricePerKgCents'],
+    'totalGrams' => $totalGrams,
+    'purchaseCount' => $purchaseCount,
+    'avgPricePerKgCents' => $avgPricePerKgCents,
 ]);

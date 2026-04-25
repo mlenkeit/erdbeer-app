@@ -7,7 +7,7 @@ Build a JSON API for the Erdbeer App — a mobile-first PWA where family groups 
 **Target users:** The React frontend consumes this API exclusively. Admin actions (season/group creation) happen via phpMyAdmin.
 
 **Success criteria:**
-- All endpoints respond in < 200ms (the leaderboard aggregation query is the most expensive — see index guidance in section 3)
+- All endpoints respond in < 200ms (the leaderboard endpoint is the most expensive — fetches all groups and their items, then computes totals in PHP)
 - Invite token validation on every request
 - Correct leaderboard ranking after every purchase mutation
 
@@ -16,7 +16,7 @@ Build a JSON API for the Erdbeer App — a mobile-first PWA where family groups 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
 | Language | PHP 8.1+ | Existing server, typed properties, enums, match |
-| Database | MySQL 8.0+ / MariaDB 10.2+ | Existing server infrastructure. Either is compatible; note which is actually deployed. |
+| Database | MySQL 8.0+ / MariaDB 10.2+ | Existing server infrastructure. Either is compatible; test the schema on the actual deployed engine. Note: TIMESTAMP `DEFAULT CURRENT_TIMESTAMP` behavior differs between MySQL versions — verify `created_at` is not overwritten on UPDATE. |
 | Style | Plain scripts, no framework | Minimal overhead, simple JSON API |
 | ORM | None — direct PDO | Fewer abstractions, full control |
 | Deployment | Subdomain `/api/*` | e.g. `erdbeeren.example.com/api/` |
@@ -34,7 +34,7 @@ Build a JSON API for the Erdbeer App — a mobile-first PWA where family groups 
 | end_date | DATE | Season end |
 | created_at | TIMESTAMP | |
 
-Constraint: `CHECK (end_date > start_date)`
+Constraint: season `end_date` must be after `start_date` (enforced in PHP during admin setup)
 
 ### `groups`
 
@@ -71,18 +71,26 @@ Index: `INDEX (group_id)`
 | price_cents | INT | Price as entered, in euro cents |
 | price_unit | ENUM('kg', '500g', '250g') | Unit the price refers to. Adding a new value requires `ALTER TABLE ... MODIFY COLUMN` which rewrites the table — acceptable at this scale. |
 
-Constraints:
-- `CHECK (bag_size_grams IN (250, 500))`
-- `CHECK (quantity BETWEEN 1 AND 99)`
-- `CHECK (price_cents BETWEEN 1 AND 99999)`
+Constraints (enforced in PHP, not in the database):
+- `bag_size_grams` must be 250 or 500
+- `quantity` must be between 1 and 99
+- `price_cents` must be between 1 and 99999
 
-Index: `INDEX (purchase_id, bag_size_grams, quantity, price_cents, price_unit)` — true covering index for leaderboard and total-price aggregation (avoids row lookup)
+Index: `INDEX (purchase_id, bag_size_grams, quantity, price_cents, price_unit)` — composite index for efficient item retrieval by purchase_id without row lookups
 
-**Price normalization:** Computed on read and returned in API responses. `price_per_kg_cents = price_cents * (1000 / unit_grams)` where unit_grams maps from price_unit (kg=1000, 500g=500, 250g=250).
+### Computed Fields (PHP)
 
-**Total grams per purchase:** `SUM(bag_size_grams * quantity)` across all items in a purchase.
+The database is a dumb store. All derived values are computed in PHP after fetching raw rows — no aggregation or business logic in SQL.
 
-**Total price per purchase:** `SUM(price_cents * quantity * bag_size_grams / unit_grams)` — the total cost in cents, normalizing each item's price to its actual weight.
+**Unit grams mapping:** `priceUnit` maps to grams: `kg` → 1000, `500g` → 500, `250g` → 250.
+
+**`pricePerKgCents` (per item):** `(int) round($priceCents * 1000 / $unitGrams)` — normalized price per kilogram in cents.
+
+**`totalGrams` (per purchase):** Sum of `$bagSizeGrams * $quantity` across all items in the purchase.
+
+**`totalPriceCents` (per purchase):** Sum of `(int) round($priceCents * $bagSizeGrams / $unitGrams) * $quantity` per item — normalize per-unit price to per-bag first, round to avoid fractional cents, then multiply by quantity and sum.
+
+**`avgPricePerKgCents` (per group):** `$totalGrams > 0 ? (int) round($totalPriceCents * 1000 / $totalGrams) : null` — weighted average across all purchases. Returns `null` (JSON) when the group has 0 purchases.
 
 ### SQL Schema
 
@@ -92,8 +100,7 @@ CREATE TABLE seasons (
     name VARCHAR(100) NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CHECK (end_date > start_date)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE groups (
@@ -124,12 +131,11 @@ CREATE TABLE purchase_items (
     price_cents INT NOT NULL,
     price_unit ENUM('kg', '500g', '250g') NOT NULL,
     INDEX idx_purchase_agg (purchase_id, bag_size_grams, quantity, price_cents, price_unit),
-    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
-    CHECK (bag_size_grams IN (250, 500)),
-    CHECK (quantity BETWEEN 1 AND 99),
-    CHECK (price_cents BETWEEN 1 AND 99999)
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
+
+The database enforces structural and referential integrity only (`NOT NULL`, `FOREIGN KEY`, `UNIQUE`, `ENUM`). All business rules (valid ranges, date checks, ownership validation) are enforced in PHP.
 
 ## 4. API Endpoints
 
@@ -139,6 +145,8 @@ Base path: `/api/`
 
 - All responses set `Content-Type: application/json; charset=utf-8`.
 - All POST/PUT requests **must** send `Content-Type: application/json`. Requests with any other content type are rejected with 415 Unsupported Media Type.
+- **Request body size limit:** 64KB maximum. Reject larger payloads with 413 Payload Too Large before parsing. Enforced via `$_SERVER['CONTENT_LENGTH']` check or `php.ini` `post_max_size`.
+- **Rate limiting:** 100 requests per 10 minutes per invite token. Return 429 Too Many Requests with `Retry-After` header. Implement via a simple file-based or database counter per token.
 - The invite token is passed in the URL path. It scopes every request to a group/season. No cookies, no sessions, no auth headers.
 - Error responses use a structured format with machine-readable codes (see Error Responses below).
 - All POST/PUT/DELETE requests that modify purchases are wrapped in a database transaction.
@@ -146,7 +154,7 @@ Base path: `/api/`
 ### CORS
 
 Set in `config.php`, applied to all responses:
-- `Access-Control-Allow-Origin`: exact frontend origin (e.g. `https://erdbeeren.example.com`). Never `*`, never reflect the request Origin.
+- `Access-Control-Allow-Origin`: exact frontend origin from a configured allowlist (e.g. `https://erdbeeren.example.com`). In development, also allow `http://localhost:5173` (Vite dev server). Never `*`, never reflect the request Origin dynamically.
 - `Access-Control-Allow-Methods`: `GET, POST, PUT, DELETE, OPTIONS`
 - `Access-Control-Allow-Headers`: `Content-Type`
 - `Access-Control-Max-Age`: `86400`
@@ -239,7 +247,7 @@ Response (200):
 }
 ```
 
-**`totalPriceCents` per purchase:** The total cost in cents, computed as `SUM(price_cents * quantity * bag_size_grams / unit_grams)` for each item — i.e., the actual cost for the actual weight purchased.
+**`totalPriceCents` per purchase:** Computed in PHP using the formula defined in section 3 "Computed Fields (PHP)".
 
 ### POST `/api/purchases/:token`
 
@@ -286,6 +294,7 @@ Response (200):
     "id": 12,
     "purchasedAt": "2026-05-10",
     "createdAt": "2026-05-10T14:30:00Z",
+    "updatedAt": "2026-05-10T14:30:00Z",
     "items": [
       { "id": 23, "bagSizeGrams": 500, "quantity": 2, "priceCents": 399, "priceUnit": "kg", "pricePerKgCents": 399 },
       { "id": 24, "bagSizeGrams": 250, "quantity": 1, "priceCents": 249, "priceUnit": "500g", "pricePerKgCents": 498 }
@@ -308,10 +317,7 @@ Ownership check: the purchase must belong to the group identified by the token. 
 
 Deletes the purchase and all its items (via CASCADE). Same ownership check as PUT.
 
-Response (200):
-```json
-{ "data": { "deleted": true } }
-```
+Response (204 No Content): No response body. The frontend checks `response.ok` for success.
 
 ### Error Responses
 
@@ -322,15 +328,18 @@ All errors use a structured format with a machine-readable code and a human-read
 ```
 
 Error codes:
-- `GROUP_NOT_FOUND` (404) — invalid or expired invite token
+- `GROUP_NOT_FOUND` (404) — invalid invite token (no matching group)
+- `SEASON_ENDED` (403) — token is valid but the season has ended; write operations (POST/PUT/DELETE) are rejected. Read operations (GET) are still allowed.
 - `PURCHASE_NOT_FOUND` (404) — purchase ID doesn't exist or doesn't belong to this group
 - `VALIDATION_ERROR` (400) — request body fails validation
 - `UNSUPPORTED_MEDIA_TYPE` (415) — missing or wrong Content-Type header
+- `PAYLOAD_TOO_LARGE` (413) — request body exceeds 64KB limit
+- `RATE_LIMITED` (429) — too many requests; include `Retry-After` header
 - `INTERNAL_ERROR` (500) — unexpected server error (no details exposed)
 
 ## 5. Validation Rules
 
-- `invite_token` must exist and map to a group in an active season (current date between start_date and end_date)
+- `invite_token` must exist and map to a group. For GET requests, the token is valid regardless of season status (allows read-only access to ended seasons). For POST/PUT/DELETE requests, the season must be active (current date between start_date and end_date inclusive); if the season has ended, return `SEASON_ENDED` (403) with message "Die Saison ist beendet".
 - `purchasedAt` must be a valid date within the season date range (inclusive: `start_date <= purchasedAt <= end_date`). Parse via `DateTime::createFromFormat('Y-m-d', $input)` and verify the formatted output matches the input string (rejects invalid dates like `2026-02-30` that PHP silently rolls over).
 - `items` array must have at least 1 item and at most 20 items
 - `bagSizeGrams` must be exactly 250 or 500 (integer type, not string — reject via `is_int()` after JSON decode)
@@ -404,6 +413,12 @@ $pdo = new PDO($dsn, $user, $pass, [
 - `ERRMODE_EXCEPTION`: errors throw instead of silently returning false
 - `EMULATE_PREPARES = false`: uses real prepared statements, prevents charset-based injection
 
+After creating the PDO connection, assert that emulated prepares are disabled:
+
+```php
+assert($pdo->getAttribute(PDO::ATTR_EMULATE_PREPARES) === false);
+```
+
 After creating the connection, set the session timezone to UTC so TIMESTAMP columns are read consistently (matching the `Z` suffix in JSON responses):
 
 ```php
@@ -434,6 +449,7 @@ All POST, PUT, and DELETE operations that touch multiple tables are wrapped in `
 ## 8. Testing Strategy
 
 - Manual testing via curl during development
+- Include a `test/smoke.sh` script with curl commands covering: create purchase, get purchase, list purchases, edit purchase, delete purchase, get leaderboard, invalid token, validation error, season-ended write rejection
 - No automated test framework (scope: MVP, ship fast)
 - SQL schema tested by running the migration on a fresh database
 
@@ -441,9 +457,11 @@ All POST, PUT, and DELETE operations that touch multiple tables are wrapped in `
 
 - [ ] GET `/api/group/:token` returns group info for a valid token
 - [ ] GET `/api/group/:token` returns 404 with `GROUP_NOT_FOUND` code for an invalid token
+- [ ] GET `/api/group/:token` returns group info (read-only) for a valid token with an ended season
 - [ ] GET `/api/leaderboard/:token` returns all groups ranked by total grams with rank and gapToNextGrams
 - [ ] POST `/api/purchases/:token` creates a purchase and returns it with computed totalGrams and pricePerKgCents per item
 - [ ] POST returns `Location` header pointing to the new resource
+- [ ] POST `/api/purchases/:token` on an ended season returns 403 with `SEASON_ENDED`
 - [ ] PUT `/api/purchases/:token/:id` replaces date and all items
 - [ ] DELETE `/api/purchases/:token/:id` removes the purchase and its items
 - [ ] Validation rejects invalid bagSizeGrams, quantity, priceCents, priceUnit
@@ -454,8 +472,22 @@ All POST, PUT, and DELETE operations that touch multiple tables are wrapped in `
 - [ ] POST/PUT without `Content-Type: application/json` returns 415
 - [ ] Direct access to `/api/config.php` is denied
 - [ ] Error responses never contain stack traces or DB details
+- [ ] Transaction rollback: POST with 1 invalid item in a multi-item purchase creates 0 rows in both tables
+- [ ] Request body > 64KB returns 413 Payload Too Large
+- [ ] Rate limiting: 101st request within 10 minutes returns 429
 
 ## 9. Boundaries
+
+### Deployment Checklist
+
+1. Create database and run `sql/schema.sql`
+2. Insert first season and groups via phpMyAdmin (generate invite tokens via `SELECT HEX(RANDOM_BYTES(16))`)
+3. Configure `config.php` with DB credentials and allowed CORS origin(s)
+4. Verify Apache `mod_rewrite` is enabled and `.htaccess` rules are active
+5. Set PHP config: `display_errors = Off`, `log_errors = On`, `post_max_size = 64K`
+6. Verify HTTPS is configured and HTTP redirects to HTTPS
+7. Run `test/smoke.sh` against the deployed API
+8. Share invite links with family groups
 
 ### Always Do
 - Validate invite tokens on every API request

@@ -6,7 +6,7 @@ CREATE TABLE seasons (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE groups (
+CREATE TABLE `groups` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     season_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -23,7 +23,8 @@ CREATE TABLE purchases (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_group_id (group_id),
-    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE RESTRICT
+    INDEX idx_group_purchased (group_id, purchased_at DESC),
+    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE purchase_items (
