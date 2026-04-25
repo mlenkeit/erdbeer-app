@@ -76,7 +76,7 @@ Constraints:
 - `CHECK (quantity BETWEEN 1 AND 99)`
 - `CHECK (price_cents BETWEEN 1 AND 99999)`
 
-Index: `INDEX (purchase_id, bag_size_grams, quantity)` — covering index for leaderboard aggregation
+Index: `INDEX (purchase_id, bag_size_grams, quantity, price_cents, price_unit)` — true covering index for leaderboard and total-price aggregation (avoids row lookup)
 
 **Price normalization:** Computed on read and returned in API responses. `price_per_kg_cents = price_cents * (1000 / unit_grams)` where unit_grams maps from price_unit (kg=1000, 500g=500, 250g=250).
 
@@ -123,7 +123,7 @@ CREATE TABLE purchase_items (
     quantity INT NOT NULL,
     price_cents INT NOT NULL,
     price_unit ENUM('kg', '500g', '250g') NOT NULL,
-    INDEX idx_purchase_agg (purchase_id, bag_size_grams, quantity),
+    INDEX idx_purchase_agg (purchase_id, bag_size_grams, quantity, price_cents, price_unit),
     FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
     CHECK (bag_size_grams IN (250, 500)),
     CHECK (quantity BETWEEN 1 AND 99),
@@ -187,6 +187,8 @@ Response (200):
 ### GET `/api/leaderboard/:token`
 
 Returns the season leaderboard (all groups, ranked by total grams). Token identifies the season via the group's season_id. Includes rank numbers and gap to next group for motivational UX.
+
+**Tie-breaking:** Groups with identical `totalGrams` share the same rank and are ordered alphabetically by name. `gapToNextGrams` is `0` between tied groups and shows the gap to the next distinct rank above.
 
 Response (200):
 ```json
@@ -265,7 +267,8 @@ Response (201):
       { "id": 23, "bagSizeGrams": 500, "quantity": 2, "priceCents": 399, "priceUnit": "kg", "pricePerKgCents": 399 },
       { "id": 24, "bagSizeGrams": 250, "quantity": 1, "priceCents": 249, "priceUnit": "500g", "pricePerKgCents": 498 }
     ],
-    "totalGrams": 1250
+    "totalGrams": 1250,
+    "totalPriceCents": 648
   }
 }
 ```
@@ -297,6 +300,8 @@ Response (200):
 
 Full replace — replaces both `purchasedAt` and all items. Same request format as POST. Implemented as delete-all-items + re-insert within a transaction.
 
+Response (200): same body shape as GET `/api/purchases/:token/:id`.
+
 Ownership check: the purchase must belong to the group identified by the token. This check must be in the same SQL query (WHERE clause with JOIN), not a separate fetch-then-check.
 
 ### DELETE `/api/purchases/:token/:id`
@@ -326,7 +331,7 @@ Error codes:
 ## 5. Validation Rules
 
 - `invite_token` must exist and map to a group in an active season (current date between start_date and end_date)
-- `purchasedAt` must be a valid date within the season date range
+- `purchasedAt` must be a valid date within the season date range (inclusive: `start_date <= purchasedAt <= end_date`). Parse via `DateTime::createFromFormat('Y-m-d', $input)` and verify the formatted output matches the input string (rejects invalid dates like `2026-02-30` that PHP silently rolls over).
 - `items` array must have at least 1 item and at most 20 items
 - `bagSizeGrams` must be exactly 250 or 500 (integer type, not string — reject via `is_int()` after JSON decode)
 - `quantity` must be a positive integer (1-99)
@@ -364,10 +369,10 @@ RewriteEngine On
 </Files>
 
 # API routes
-RewriteRule ^group/([a-f0-9]{32})$ group.php?token=$1 [L,QSA]
-RewriteRule ^leaderboard/([a-f0-9]{32})$ leaderboard.php?token=$1 [L,QSA]
-RewriteRule ^purchases/([a-f0-9]{32})$ purchases.php?token=$1 [L,QSA]
-RewriteRule ^purchases/([a-f0-9]{32})/([0-9]+)$ purchases.php?token=$1&id=$2 [L,QSA]
+RewriteRule ^group/([a-f0-9]{32})$ group.php?token=$1 [L]
+RewriteRule ^leaderboard/([a-f0-9]{32})$ leaderboard.php?token=$1 [L]
+RewriteRule ^purchases/([a-f0-9]{32})$ purchases.php?token=$1 [L]
+RewriteRule ^purchases/([a-f0-9]{32})/([0-9]+)$ purchases.php?token=$1&id=$2 [L]
 ```
 
 PHP files read parameters via `$_GET['token']` and `$_GET['id']`, then dispatch based on `$_SERVER['REQUEST_METHOD']`.
@@ -399,6 +404,12 @@ $pdo = new PDO($dsn, $user, $pass, [
 - `ERRMODE_EXCEPTION`: errors throw instead of silently returning false
 - `EMULATE_PREPARES = false`: uses real prepared statements, prevents charset-based injection
 
+After creating the connection, set the session timezone to UTC so TIMESTAMP columns are read consistently (matching the `Z` suffix in JSON responses):
+
+```php
+$pdo->exec("SET time_zone = '+00:00'");
+```
+
 ### JSON Input Parsing
 
 All POST/PUT endpoints read the request body via:
@@ -414,7 +425,7 @@ $input = json_decode(file_get_contents('php://input'), true, 512, JSON_THROW_ON_
 
 ### Error Handling
 
-`config.php` registers a global exception handler that catches all uncaught exceptions and returns a JSON error response with code `INTERNAL_ERROR`. No stack traces, file paths, or DB details are ever exposed in responses.
+`config.php` registers a global exception handler that catches all uncaught exceptions and returns a JSON error response with code `INTERNAL_ERROR`. `JsonException` from malformed request bodies must be caught separately and mapped to `VALIDATION_ERROR` (400), not `INTERNAL_ERROR` (500). No stack traces, file paths, or DB details are ever exposed in responses.
 
 ### Transactions
 
