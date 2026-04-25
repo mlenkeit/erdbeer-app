@@ -28,26 +28,40 @@ The frontend consumes the backend API documented in SPEC-BACKEND.md. Key points:
 
 - **Base path:** `/api/`
 - **Auth:** Invite token passed as a URL path segment in every request. No cookies, no headers.
-- **Responses:** JSON. Errors: `{"error": "message"}` with standard HTTP status codes.
+- **Response envelope:** All successful responses wrap data in `{ "data": ... }`. Errors use `{ "error": { "code": "...", "message": "..." } }` with machine-readable codes and German messages.
+- **Content-Type:** All requests with a body must send `Content-Type: application/json`.
 
 ### Endpoints Used
 
 | Method | Endpoint | Used By |
 |--------|----------|---------|
-| GET | `/api/group/:token` | GroupHome — load group info + stats |
-| GET | `/api/leaderboard/:token` | Leaderboard, GroupHome mini-leaderboard |
-| GET | `/api/purchases/:token` | History — list all purchases |
+| GET | `/api/group/:token` | GroupHome — load group info + stats + avgPricePerKgCents |
+| GET | `/api/leaderboard/:token` | Leaderboard, GroupHome mini-leaderboard. Returns rank, gapToNextGrams, and full season dates. |
+| GET | `/api/purchases/:token` | History — list all purchases with summary totals and per-item pricePerKgCents |
 | POST | `/api/purchases/:token` | NewPurchase — create purchase |
 | GET | `/api/purchases/:token/:id` | EditPurchase — load existing purchase |
-| PUT | `/api/purchases/:token/:id` | EditPurchase — save changes |
+| PUT | `/api/purchases/:token/:id` | EditPurchase — full replace (date + all items) |
 | DELETE | `/api/purchases/:token/:id` | EditPurchase — delete purchase |
 
 ### Key Data Formats
 
-- **Prices:** Sent/received as integer cents (`priceCents: 399` = 3,99 €)
+- **Prices:** Sent/received as integer cents (`priceCents: 399` = 3,99 €). Normalized `pricePerKgCents` is computed by the backend and returned on each item.
 - **Dates:** ISO format strings (`"2026-05-10"`)
 - **Bag sizes:** Integer grams (`250` or `500`)
 - **Price units:** String enum (`"kg"`, `"500g"`, `"250g"`)
+
+### Error Handling
+
+The API returns structured errors. The frontend should switch on `error.code` (not the German message) for control flow:
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `GROUP_NOT_FOUND` | 404 | Invalid or expired invite token |
+| `PURCHASE_NOT_FOUND` | 404 | Purchase doesn't exist or doesn't belong to this group |
+| `VALIDATION_ERROR` | 400 | Request body fails validation |
+| `INTERNAL_ERROR` | 500 | Unexpected server error |
+
+Display `error.message` to the user (it's already in German).
 
 ## 4. Routes
 
@@ -70,9 +84,10 @@ All screens are mobile-first (max-width ~480px primary target, responsive up to 
 The landing page after tapping the invite link. Shows:
 - Group name as header (e.g. "Max & Anna")
 - Season name and date range
-- Quick stats card: total grams consumed by this group, number of purchases
+- Quick stats card: total grams consumed by this group, number of purchases, average price per kg
 - **"Einkauf erfassen" button** — prominent, primary action
-- Mini leaderboard preview: top 3 groups with their totals, this group highlighted
+- Mini leaderboard preview: top 3 groups with their totals and ranks, this group highlighted. Show gap to next group (e.g. "500g hinter Platz 1!")
+- Season progress: date range and/or "noch X Tage" countdown (data from `season.startDate`/`endDate`)
 - Links to full "Rangliste" and "Verlauf"
 
 ### 5.2 Purchase Form (`/:token/erfassen`)
@@ -111,12 +126,13 @@ Each row shows:
 Ranked list of all groups in the season by total grams consumed.
 
 Each row shows:
-- Rank (1, 2, 3, ...)
+- Rank number (from API `rank` field)
 - Group name
 - Total grams (formatted: e.g. "4,5 kg" or "750 g")
 - Number of purchases
+- Gap to the group ahead (from API `gapToNextGrams` — e.g. "+1.500g hinter Platz 1!")
 
-The current group is visually highlighted. The ranking should feel alive — consider showing the gap to the next group (e.g. "+250g vor Platz 3").
+The current group is visually highlighted.
 
 ## 6. Frontend Validation
 
@@ -127,7 +143,7 @@ Validation is for UX — the backend is the source of truth.
 - Bag size must be 250 or 500
 - Quantity must be a positive integer (1-99)
 - Price must be a positive number (0,01-999,99)
-- At least 1 line item required
+- At least 1 line item required, maximum 20 items per purchase
 
 ## 7. Project Structure
 
