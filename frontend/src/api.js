@@ -38,7 +38,15 @@ async function request(method, path, body) {
     return null
   }
 
-  const json = await response.json()
+  let json
+  try {
+    json = await response.json()
+  } catch {
+    if (response.status === 404) {
+      throw new ApiError('GROUP_NOT_FOUND', 'Gruppe nicht gefunden')
+    }
+    throw new ApiError('INVALID_RESPONSE', 'Etwas ist schiefgelaufen')
+  }
 
   if (!response.ok) {
     const err = json.error || {}
