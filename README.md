@@ -11,24 +11,22 @@ A mobile-first Progressive Web App for family groups to compete in tracking stra
 
 ## Local Development
 
-### Frontend
+Start the backend (MySQL + PHP API) and frontend dev server:
 
 ```bash
+docker compose up -d
 cd frontend
-cp .env.example .env.local    # adjust API URL if needed
 npm install
-npm run dev                    # starts dev server on http://localhost:5173
+npm run dev
 ```
 
-### Backend (Docker)
+Open http://localhost:5173/aaaabbbbccccddddeeeeffffgggghhhh in your browser. The seed data in `sql/seed.sql` creates a test group with that token.
 
-The backend test infrastructure provides a full PHP + MySQL environment:
+To start fresh, remove the database volume:
 
 ```bash
-docker compose -f docker-compose.test.yml up --build
+docker compose down -v
 ```
-
-This starts MySQL, the PHP API on Apache, and runs the PHPUnit test suite.
 
 ### Running Tests
 
@@ -144,7 +142,8 @@ Share the invite link with your group: `https://your-domain.com/<invite_token>`
 │   │   └── utils/        # Formatting helpers
 │   └── public/           # Static assets, manifest, .htaccess
 ├── sql/
-│   └── schema.sql        # Database schema (4 tables)
+│   ├── schema.sql        # Database schema (4 tables)
+│   └── seed.sql          # Dev seed data (season + group)
 ├── tests/                # PHPUnit integration tests
 └── .github/workflows/
     ├── ci.yml            # Lint, test, build on push/PR
