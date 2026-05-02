@@ -1,0 +1,20 @@
+RewriteEngine On
+
+<Files "config.php">
+    Require all denied
+</Files>
+<Files "helpers.php">
+    Require all denied
+</Files>
+<Files "setup.php">
+    Require all denied
+</Files>
+<FilesMatch "^\.htaccess">
+    Require all denied
+</FilesMatch>
+
+RewriteRule ^group/([a-f0-9]{32})$ group.php?token=$1 [L]
+RewriteRule ^leaderboard/([a-f0-9]{32})$ leaderboard.php?token=$1 [L]
+RewriteRule ^purchases/([a-f0-9]{32})$ purchases.php?token=$1 [L]
+RewriteRule ^purchases/([a-f0-9]{32})/([0-9]+)$ purchases.php?token=$1&id=$2 [L]
+RewriteRule ^setup/([a-f0-9]{64})$ setup.php?token=$1 [L]

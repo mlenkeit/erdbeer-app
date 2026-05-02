@@ -1,0 +1,37 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: dev
+      MYSQL_DATABASE: erdbeer_dev
+    volumes:
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: db
+      DB_NAME: erdbeer_dev
+      DB_USER: root
+      DB_PASS: dev
+      ALLOWED_ORIGIN: "http://localhost:5173"
+    volumes:
+      - ./api:/var/www/html/api:ro
+      - ./sql:/var/www/html/sql:ro
+
+volumes:
+  db-data:

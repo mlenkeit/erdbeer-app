@@ -1,0 +1,72 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Assemble deploy directory
+        working-directory: .
+        run: |
+          mkdir -p deploy/api deploy/sql
+          cp -r frontend/dist/* deploy/
+          cp api/*.php api/.htaccess deploy/api/
+          cp sql/schema.sql deploy/sql/
+
+      - name: Generate .htaccess with credentials
+        working-directory: .
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+          SETUP_TOKEN: ${{ secrets.SETUP_TOKEN }}
+        run: |
+          {
+            printf 'SetEnv DB_HOST "%s"\n' "$DB_HOST"
+            printf 'SetEnv DB_NAME "%s"\n' "$DB_NAME"
+            printf 'SetEnv DB_USER "%s"\n' "$DB_USER"
+            printf 'SetEnv DB_PASS "%s"\n' "$DB_PASS"
+            printf 'SetEnv ALLOWED_ORIGIN "%s"\n' "$ALLOWED_ORIGIN"
+            printf 'SetEnv SETUP_TOKEN "%s"\n' "$SETUP_TOKEN"
+            printf '\n'
+            cat deploy/api/.htaccess
+          } > deploy/api/.htaccess.tmp
+          mv deploy/api/.htaccess.tmp deploy/api/.htaccess
+
+      - name: Upload via FTP
+        uses: SamKirkland/FTP-Deploy-Action@5d5ad6083cf4e7daa3e1ed552feb1f79927e9bc7 # v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: ./deploy/
+          server-dir: ${{ secrets.FTP_REMOTE_PATH }}/
