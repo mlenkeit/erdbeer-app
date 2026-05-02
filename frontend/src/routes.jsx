@@ -13,7 +13,7 @@ const Leaderboard = lazy(() => import('./pages/Leaderboard'))
 
 function SuspenseWrapper({ children }) {
   return (
-    <Suspense fallback={<div className="animate-pulse p-4 text-text-secondary">Laden...</div>}>
+    <Suspense fallback={<div className="animate-pulse p-4 text-ink-500">Laden...</div>}>
       {children}
     </Suspense>
   )
