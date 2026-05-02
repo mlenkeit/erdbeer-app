@@ -1,24 +1,23 @@
 import { Link, useParams } from 'react-router-dom'
+import { EmptyState } from '../components/EmptyState'
 
 export default function NotFound() {
   const { token } = useParams()
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-text mb-2">Seite nicht gefunden</h1>
-        <p className="text-sm text-text-secondary mb-4">
-          Diese Seite existiert nicht.
-        </p>
-        {token && (
+    <div className="min-h-dvh bg-cream-100 flex items-center justify-center px-4">
+      <EmptyState
+        title="Seite nicht gefunden"
+        description="Diese Seite existiert nicht."
+        action={token ? (
           <Link
             to={`/${token}`}
-            className="inline-block px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium"
+            className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-strawberry-500 px-5 py-3 text-base font-semibold text-white shadow-[0_8px_18px_rgba(233,67,74,0.28)] transition active:scale-[0.98]"
           >
             Zurück zur Startseite
           </Link>
-        )}
-      </div>
+        ) : undefined}
+      />
     </div>
   )
 }

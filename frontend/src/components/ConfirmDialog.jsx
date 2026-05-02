@@ -38,25 +38,25 @@ export default function ConfirmDialog({ title, message, confirmLabel, cancelLabe
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="bg-surface rounded-xl shadow-lg p-6 max-w-sm w-full"
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-text mb-2">{title}</h2>
-        <p className="text-sm text-text-secondary mb-6">{message}</p>
+        <h2 className="text-lg font-semibold text-ink-900 mb-2">{title}</h2>
+        <p className="text-sm text-ink-500 mb-6">{message}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl text-sm font-medium border border-gray-200 text-text-secondary"
+            className="min-h-12 flex-1 rounded-xl border border-cream-300 py-3 text-sm font-medium text-ink-700"
           >
             {cancelLabel}
           </button>
           <button
             ref={confirmRef}
             onClick={onConfirm}
-            className={`flex-1 py-3 rounded-xl text-sm font-medium ${
+            className={`min-h-12 flex-1 rounded-xl py-3 text-sm font-semibold ${
               destructive
-                ? 'border border-error text-error'
-                : 'bg-primary text-white'
+                ? 'border border-strawberry-200 text-strawberry-700'
+                : 'bg-strawberry-500 text-white shadow-sm'
             }`}
           >
             {confirmLabel}
