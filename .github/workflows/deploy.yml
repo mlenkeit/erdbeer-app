@@ -36,6 +36,7 @@ jobs:
         run: |
           mkdir -p deploy/api deploy/sql
           cp -r frontend/dist/* deploy/
+          cp frontend/dist/.htaccess deploy/
           cp api/*.php api/.htaccess deploy/api/
           cp sql/schema.sql deploy/sql/
 
