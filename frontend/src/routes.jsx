@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { TokenProvider } from './context/TokenContext'
 import Layout from './components/Layout'
 import NotFound from './pages/NotFound'
+import Welcome from './pages/Welcome'
 
 const GroupHome = lazy(() => import('./pages/GroupHome'))
 const NewPurchase = lazy(() => import('./pages/NewPurchase'))
@@ -19,6 +20,10 @@ function SuspenseWrapper({ children }) {
 }
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Welcome />,
+  },
   {
     path: '/:token',
     element: (
