@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
-$token = $_GET['token'] ?? '';
+$token = queryParam('token');
 $group = validateToken($pdo, $token);
 
 checkRateLimit($token);
 
 $method = $_SERVER['REQUEST_METHOD'];
-$purchaseId = isset($_GET['id']) ? (int) $_GET['id'] : null;
+$idParam = queryParam('id');
+$purchaseId = $idParam !== '' ? (int) $idParam : null;
 
 if ($purchaseId !== null) {
     handleSinglePurchase($pdo, $group, $token, $purchaseId, $method);
