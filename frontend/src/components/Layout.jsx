@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useToken } from '../context/TokenContext'
 import { isSeasonEnded } from '../utils/season'
+import { DecorativeBerry } from './DecorativeBerry'
+import { EmptyState } from './EmptyState'
 
 function HouseIcon({ className }) {
   return (
@@ -55,8 +57,8 @@ export default function Layout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-text-secondary">Laden...</div>
+      <div className="min-h-dvh bg-cream-100 flex items-center justify-center">
+        <div className="animate-pulse text-ink-500">Laden...</div>
       </div>
     )
   }
@@ -64,32 +66,28 @@ export default function Layout() {
   if (error) {
     const isNotFound = error.code === 'GROUP_NOT_FOUND'
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-text mb-2">
-            {isNotFound ? 'Ungültiger Einladungslink' : 'Etwas ist schiefgelaufen'}
-          </h1>
-          <p className="text-sm text-text-secondary mb-4">
-            {isNotFound
-              ? 'Dieser Link ist ungültig oder abgelaufen.'
-              : error.message || 'Bitte versuche es erneut.'}
-          </p>
-          {!isNotFound && (
+      <div className="min-h-dvh bg-cream-100 flex items-center justify-center px-4">
+        <EmptyState
+          title={isNotFound ? 'Ungültiger Einladungslink' : 'Etwas ist schiefgelaufen'}
+          description={isNotFound
+            ? 'Bitte prüfe den Link oder lass dir einen neuen schicken.'
+            : error.message || 'Bitte versuche es erneut.'}
+          action={!isNotFound ? (
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium"
+              className="min-h-12 rounded-2xl bg-strawberry-500 px-5 py-3 text-base font-semibold text-white shadow-[0_8px_18px_rgba(233,67,74,0.28)] transition active:scale-[0.98]"
             >
               Nochmal versuchen
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       </div>
     )
   }
 
   if (isFormPage) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-dvh bg-cream-100">
         <main className="max-w-md mx-auto px-4 py-4">
           <Outlet />
         </main>
@@ -98,57 +96,74 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}>
-      <header className="bg-surface border-b border-gray-100 px-4 py-3 max-w-md mx-auto w-full">
-        <h1 className="text-lg font-semibold text-text truncate">{group?.name}</h1>
-        {season && (
-          <p className="text-xs text-text-secondary">{season.name}</p>
-        )}
+    <div className="min-h-dvh bg-cream-100 flex flex-col" style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))' }}>
+      <header className="px-4 pt-4 pb-3 max-w-md mx-auto w-full">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-leaf-600">Erdbeer-Saison</p>
+            <h1 className="font-heading text-2xl text-leaf-900 tracking-tight truncate">{group?.name}</h1>
+            {season && (
+              <p className="mt-0.5 text-sm text-leaf-700">{season.name}</p>
+            )}
+          </div>
+          <DecorativeBerry className="h-10 w-10 shrink-0 drop-shadow-sm" />
+        </div>
       </header>
 
       <main className="max-w-md mx-auto w-full px-4 py-4 flex-1">
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-gray-100" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="max-w-md mx-auto flex">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-cream-300/70 bg-white/95 px-3 pt-2 shadow-[0_-8px_24px_rgba(80,40,20,0.08)] backdrop-blur"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+      >
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
           <NavLink
             to={`/${token}`}
             end
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-2 text-xs ${isActive ? 'text-primary' : 'text-text-secondary'}`
+              `flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium ${
+                isActive ? 'bg-blush-100 text-strawberry-600' : 'text-ink-500'
+              }`
             }
           >
-            <HouseIcon className="w-6 h-6 mb-0.5" />
+            <HouseIcon className="h-5 w-5" />
             <span>Home</span>
           </NavLink>
           {!seasonEnded && (
             <NavLink
               to={`/${token}/erfassen`}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center py-2 text-xs ${isActive ? 'text-primary' : 'text-primary/70'}`
+                `flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium ${
+                  isActive ? 'bg-blush-100 text-strawberry-600' : 'text-strawberry-500'
+                }`
               }
             >
-              <PlusIcon className="w-6 h-6 mb-0.5" />
+              <PlusIcon className="h-5 w-5" />
               <span>Erfassen</span>
             </NavLink>
           )}
           <NavLink
             to={`/${token}/verlauf`}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-2 text-xs ${isActive ? 'text-primary' : 'text-text-secondary'}`
+              `flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium ${
+                isActive ? 'bg-blush-100 text-strawberry-600' : 'text-ink-500'
+              }`
             }
           >
-            <ListIcon className="w-6 h-6 mb-0.5" />
+            <ListIcon className="h-5 w-5" />
             <span>Verlauf</span>
           </NavLink>
           <NavLink
             to={`/${token}/rangliste`}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-2 text-xs ${isActive ? 'text-primary' : 'text-text-secondary'}`
+              `flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium ${
+                isActive ? 'bg-blush-100 text-strawberry-600' : 'text-ink-500'
+              }`
             }
           >
-            <TrophyIcon className="w-6 h-6 mb-0.5" />
+            <TrophyIcon className="h-5 w-5" />
             <span>Rangliste</span>
           </NavLink>
         </div>
