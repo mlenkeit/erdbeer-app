@@ -3,19 +3,33 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 
-$token = $_GET['token'] ?? '';
-$expectedToken = getenv('SETUP_TOKEN');
+function env(string $key, string $default = ''): string {
+    static $fileEnv = null;
+    if ($fileEnv === null) {
+        $envFile = __DIR__ . '/env.php';
+        $fileEnv = is_file($envFile) ? (require $envFile) : [];
+    }
+    if (isset($fileEnv[$key]) && $fileEnv[$key] !== '') return $fileEnv[$key];
+    $val = getenv($key);
+    if ($val !== false && $val !== '') return $val;
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+    if (isset($_SERVER['REDIRECT_' . $key]) && $_SERVER['REDIRECT_' . $key] !== '') return $_SERVER['REDIRECT_' . $key];
+    return $default;
+}
 
-if ($expectedToken === false || $expectedToken === '' || !hash_equals($expectedToken, $token)) {
+$token = $_GET['token'] ?? '';
+$expectedToken = env('SETUP_TOKEN');
+
+if ($expectedToken === '' || !hash_equals($expectedToken, $token)) {
     http_response_code(403);
     echo json_encode(['error' => ['code' => 'FORBIDDEN', 'message' => 'Invalid setup token']]);
     exit;
 }
 
-$dbHost = getenv('DB_HOST') ?: 'localhost';
-$dbName = getenv('DB_NAME') ?: 'erdbeer';
-$dbUser = getenv('DB_USER') ?: 'root';
-$dbPass = getenv('DB_PASS') ?: '';
+$dbHost = env('DB_HOST', 'localhost');
+$dbName = env('DB_NAME', 'erdbeer');
+$dbUser = env('DB_USER', 'root');
+$dbPass = env('DB_PASS');
 
 $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
 

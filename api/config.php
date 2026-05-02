@@ -15,10 +15,24 @@ set_exception_handler(function (\Throwable $e): void {
     exit;
 });
 
-$dbHost = getenv('DB_HOST') ?: 'localhost';
-$dbName = getenv('DB_NAME') ?: 'erdbeer';
-$dbUser = getenv('DB_USER') ?: 'root';
-$dbPass = getenv('DB_PASS') ?: '';
+function env(string $key, string $default = ''): string {
+    static $fileEnv = null;
+    if ($fileEnv === null) {
+        $envFile = __DIR__ . '/env.php';
+        $fileEnv = is_file($envFile) ? (require $envFile) : [];
+    }
+    if (isset($fileEnv[$key]) && $fileEnv[$key] !== '') return $fileEnv[$key];
+    $val = getenv($key);
+    if ($val !== false && $val !== '') return $val;
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+    if (isset($_SERVER['REDIRECT_' . $key]) && $_SERVER['REDIRECT_' . $key] !== '') return $_SERVER['REDIRECT_' . $key];
+    return $default;
+}
+
+$dbHost = env('DB_HOST', 'localhost');
+$dbName = env('DB_NAME', 'erdbeer');
+$dbUser = env('DB_USER', 'root');
+$dbPass = env('DB_PASS');
 
 $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
 
@@ -36,8 +50,8 @@ $allowedOrigins = [
     'http://localhost:5173',
 ];
 
-$productionOrigin = getenv('ALLOWED_ORIGIN');
-if ($productionOrigin !== false && $productionOrigin !== '') {
+$productionOrigin = env('ALLOWED_ORIGIN');
+if ($productionOrigin !== '') {
     $allowedOrigins[] = $productionOrigin;
 }
 
