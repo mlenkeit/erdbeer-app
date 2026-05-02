@@ -3,17 +3,17 @@ import { useState, useRef } from 'react'
 export function SegmentedControl({ options, value, onChange, label }) {
   return (
     <fieldset>
-      {label && <legend className="text-xs font-medium text-text-secondary mb-1">{label}</legend>}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+      {label && <legend className="mb-2 text-sm font-semibold text-leaf-900">{label}</legend>}
+      <div className="grid rounded-2xl bg-cream-200 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}>
         {options.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-colors min-h-[44px] ${
+            className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors min-h-[44px] ${
               value === opt.value
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-text-secondary'
+                ? 'bg-strawberry-500 text-white shadow-sm'
+                : 'text-ink-700'
             }`}
           >
             {opt.label}
@@ -61,13 +61,13 @@ export function NumberStepper({ value, onChange, min = 1, max = 99, label, id })
 
   return (
     <div>
-      {label && <label htmlFor={id} className="text-xs font-medium text-text-secondary mb-1 block">{label}</label>}
-      <div className="flex items-center gap-1">
+      {label && <label htmlFor={id} className="mb-2 block text-sm font-semibold text-leaf-900">{label}</label>}
+      <div className="grid min-h-12 grid-cols-3 overflow-hidden rounded-2xl border border-cream-300 bg-white">
         <button
           type="button"
           onClick={handleDecrement}
           disabled={value <= min}
-          className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 text-text font-bold text-lg disabled:opacity-30"
+          className="flex items-center justify-center text-xl font-semibold text-strawberry-500 disabled:opacity-30"
           aria-label="Weniger"
         >
           −
@@ -82,13 +82,13 @@ export function NumberStepper({ value, onChange, min = 1, max = 99, label, id })
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleInputBlur}
             onKeyDown={handleInputKeyDown}
-            className="w-12 h-11 text-center text-sm font-semibold border border-gray-200 rounded-lg tabular-nums"
+            className="text-center text-lg font-semibold tabular-nums text-ink-900 outline-none"
           />
         ) : (
           <button
             type="button"
             onClick={handleCenterTap}
-            className="w-12 h-11 text-center text-sm font-semibold tabular-nums border border-gray-200 rounded-lg"
+            className="flex items-center justify-center text-lg font-semibold tabular-nums text-ink-900"
             aria-label={`Menge: ${value}, tippen zum Bearbeiten`}
           >
             {value}
@@ -98,7 +98,7 @@ export function NumberStepper({ value, onChange, min = 1, max = 99, label, id })
           type="button"
           onClick={handleIncrement}
           disabled={value >= max}
-          className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 text-text font-bold text-lg disabled:opacity-30"
+          className="flex items-center justify-center text-xl font-semibold text-strawberry-500 disabled:opacity-30"
           aria-label="Mehr"
         >
           +
@@ -111,7 +111,7 @@ export function NumberStepper({ value, onChange, min = 1, max = 99, label, id })
 export function PriceInput({ value, onChange, error, id }) {
   return (
     <div>
-      <label htmlFor={id} className="text-xs font-medium text-text-secondary mb-1 block">Preis</label>
+      <label htmlFor={id} className="mb-2 block text-sm font-semibold text-leaf-900">Preis</label>
       <div className="relative">
         <input
           id={id}
@@ -120,16 +120,16 @@ export function PriceInput({ value, onChange, error, id }) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0,00"
-          className={`w-full h-12 px-3 pr-14 text-base border rounded-lg bg-surface ${
-            error ? 'border-error' : 'border-gray-200'
+          className={`min-h-12 w-full rounded-xl border bg-white px-4 pr-14 text-base text-ink-900 shadow-[0_2px_8px_rgba(80,40,20,0.04)] placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-strawberry-100 ${
+            error ? 'border-strawberry-600 focus:border-strawberry-600' : 'border-cream-300 focus:border-strawberry-300'
           }`}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-secondary">EUR</span>
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-500">EUR</span>
       </div>
       {error && (
-        <p id={`${id}-error`} className="text-xs text-error mt-1">{error}</p>
+        <p id={`${id}-error`} className="mt-1 text-xs text-strawberry-700">{error}</p>
       )}
     </div>
   )
