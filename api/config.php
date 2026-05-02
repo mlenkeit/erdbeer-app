@@ -16,6 +16,12 @@ set_exception_handler(function (\Throwable $e): void {
 });
 
 function env(string $key, string $default = ''): string {
+    static $fileEnv = null;
+    if ($fileEnv === null) {
+        $envFile = __DIR__ . '/env.php';
+        $fileEnv = is_file($envFile) ? (require $envFile) : [];
+    }
+    if (isset($fileEnv[$key]) && $fileEnv[$key] !== '') return $fileEnv[$key];
     $val = getenv($key);
     if ($val !== false && $val !== '') return $val;
     if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];

@@ -6,7 +6,7 @@ RewriteEngine On
 <Files "helpers.php">
     Require all denied
 </Files>
-<Files "setup.php">
+<Files "env.php">
     Require all denied
 </Files>
 <FilesMatch "^\.htaccess">
