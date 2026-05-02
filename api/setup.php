@@ -18,6 +18,13 @@ function env(string $key, string $default = ''): string {
 }
 
 $token = $_GET['token'] ?? '';
+if ($token === '') {
+    $qs = $_SERVER['REDIRECT_QUERY_STRING'] ?? '';
+    if ($qs !== '') {
+        parse_str($qs, $qsParams);
+        $token = $qsParams['token'] ?? '';
+    }
+}
 $expectedToken = env('SETUP_TOKEN');
 
 if ($expectedToken === '' || !hash_equals($expectedToken, $token)) {

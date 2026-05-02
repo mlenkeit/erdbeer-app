@@ -1,6 +1,21 @@
 <?php
 declare(strict_types=1);
 
+function queryParam(string $key): string
+{
+    if (isset($_GET[$key]) && $_GET[$key] !== '') {
+        return $_GET[$key];
+    }
+    $qs = $_SERVER['REDIRECT_QUERY_STRING'] ?? '';
+    if ($qs !== '') {
+        parse_str($qs, $params);
+        if (isset($params[$key]) && $params[$key] !== '') {
+            return $params[$key];
+        }
+    }
+    return '';
+}
+
 function jsonResponse(mixed $data, int $status = 200): never
 {
     http_response_code($status);
