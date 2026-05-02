@@ -6,11 +6,26 @@ function queryParam(string $key): string
     if (isset($_GET[$key]) && $_GET[$key] !== '') {
         return $_GET[$key];
     }
-    $qs = $_SERVER['REDIRECT_QUERY_STRING'] ?? '';
-    if ($qs !== '') {
-        parse_str($qs, $params);
-        if (isset($params[$key]) && $params[$key] !== '') {
-            return $params[$key];
+    foreach (['REDIRECT_QUERY_STRING', 'QUERY_STRING'] as $qs_key) {
+        $qs = $_SERVER[$qs_key] ?? '';
+        if ($qs !== '') {
+            parse_str($qs, $params);
+            if (isset($params[$key]) && $params[$key] !== '') {
+                return $params[$key];
+            }
+        }
+    }
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $path = parse_url($uri, PHP_URL_PATH) ?? '';
+    $path = preg_replace('#^/api/#', '', $path);
+    if ($key === 'token') {
+        if (preg_match('#^(?:group|leaderboard|purchases|setup)/([a-f0-9]+)#', $path, $m)) {
+            return $m[1];
+        }
+    }
+    if ($key === 'id') {
+        if (preg_match('#^purchases/[a-f0-9]+/(\d+)#', $path, $m)) {
+            return $m[1];
         }
     }
     return '';
