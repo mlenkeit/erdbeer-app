@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SegmentedControl, NumberStepper, PriceInput } from './FormInputs'
 import { CloseIcon } from './Icons'
+import { AppCard } from './AppCard'
 import { PRICE_PATTERN, parsePriceToCents } from '../utils/price'
 
 function createEmptyItem() {
@@ -101,15 +102,15 @@ export default function PurchaseForm({ season, onSubmit, onDelete, initialData, 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="bg-error/10 border border-error/20 text-error text-sm rounded-xl px-4 py-3" role="alert">
-          {error}
-        </div>
+        <AppCard className="border-strawberry-200 bg-blush-50 px-4 py-3" role="alert">
+          <p className="text-sm text-strawberry-700">{error}</p>
+        </AppCard>
       )}
 
-      <div>
-        <label htmlFor="purchase-date" className="text-xs font-medium text-text-secondary mb-1 block">Datum</label>
+      <AppCard className="space-y-4 p-4">
+        <label htmlFor="purchase-date" className="block text-sm font-semibold text-leaf-900">Datum</label>
         <input
           id="purchase-date"
           type="date"
@@ -117,35 +118,35 @@ export default function PurchaseForm({ season, onSubmit, onDelete, initialData, 
           onChange={(e) => setDate(e.target.value)}
           min={season?.startDate}
           max={season?.endDate}
-          className={`w-full h-12 px-3 text-base border rounded-lg bg-surface ${
-            dateError ? 'border-error' : 'border-gray-200'
+          className={`min-h-12 w-full rounded-xl border bg-white px-4 text-base text-ink-900 shadow-[0_2px_8px_rgba(80,40,20,0.04)] focus:outline-none focus:ring-2 focus:ring-strawberry-100 ${
+            dateError ? 'border-strawberry-600' : 'border-cream-300 focus:border-strawberry-300'
           }`}
           aria-invalid={dateError ? 'true' : undefined}
           aria-describedby={dateError ? 'date-error' : undefined}
         />
         {dateError && (
-          <p id="date-error" className="text-xs text-error mt-1">{dateError}</p>
+          <p id="date-error" className="text-xs text-strawberry-700">{dateError}</p>
         )}
-      </div>
+      </AppCard>
 
-      <div className="space-y-4">
-        <p className="text-sm font-semibold text-text">Was hast du gekauft?</p>
+      <AppCard className="space-y-4 p-4">
+        <h2 className="text-base font-semibold text-leaf-900">Was hast du gekauft?</h2>
 
         {items.map((item, index) => (
-          <div key={index} className="bg-surface rounded-xl shadow-sm p-3 space-y-3 relative">
+          <div key={index} className="space-y-4 relative rounded-xl bg-cream-50 p-3">
             {items.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeItem(index)}
-                className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-text-secondary"
+                className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center text-ink-500"
                 aria-label={`Position ${index + 1} entfernen`}
               >
-                <CloseIcon className="w-4 h-4" />
+                <CloseIcon className="h-4 w-4" />
               </button>
             )}
 
             {items.length > 1 && (
-              <p className="text-xs text-text-secondary">Position {index + 1}</p>
+              <p className="text-xs font-medium text-ink-500">Position {index + 1}</p>
             )}
 
             <SegmentedControl
@@ -191,14 +192,14 @@ export default function PurchaseForm({ season, onSubmit, onDelete, initialData, 
           <button
             type="button"
             onClick={addItem}
-            className="w-full py-3 border border-gray-200 rounded-xl text-sm font-medium text-text-secondary min-h-[48px]"
+            className="min-h-12 w-full rounded-xl border border-cream-300 py-3 text-sm font-semibold text-leaf-900"
           >
             + Weitere Position
           </button>
         ) : (
-          <p className="text-xs text-text-secondary text-center">Maximal 20 Positionen pro Einkauf.</p>
+          <p className="text-center text-xs text-ink-500">Maximal 20 Positionen pro Einkauf.</p>
         )}
-      </div>
+      </AppCard>
 
       <div className="flex gap-3">
         {showDelete && onDelete && (
@@ -206,7 +207,7 @@ export default function PurchaseForm({ season, onSubmit, onDelete, initialData, 
             type="button"
             onClick={onDelete}
             disabled={submitting}
-            className="py-3 px-6 border border-error text-error rounded-xl text-sm font-medium min-h-[48px] disabled:opacity-50"
+            className="min-h-12 rounded-xl border border-strawberry-200 bg-white px-4 py-3 text-sm font-semibold text-strawberry-700 disabled:opacity-50"
           >
             Löschen
           </button>
@@ -214,10 +215,10 @@ export default function PurchaseForm({ season, onSubmit, onDelete, initialData, 
         <button
           type="submit"
           disabled={!isValid || submitting}
-          className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-semibold shadow-sm min-h-[48px] disabled:opacity-50 flex items-center justify-center gap-2"
+          className="min-h-12 flex-1 rounded-2xl bg-strawberry-500 py-3 text-base font-semibold text-white shadow-[0_8px_18px_rgba(233,67,74,0.28)] transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {submitting && (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round" />
             </svg>
           )}

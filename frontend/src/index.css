@@ -1,18 +1,67 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #E53935;
-  --color-secondary: #43A047;
-  --color-background: #FFF8F5;
-  --color-surface: #FFFFFF;
-  --color-text: #1A1A1A;
-  --color-text-secondary: #6B7280;
-  --color-accent: #D48D00;
-  --color-error: #D32F2F;
+  --color-strawberry-50: #FFF1F2;
+  --color-strawberry-100: #FFE4E6;
+  --color-strawberry-200: #FECFD3;
+  --color-strawberry-300: #F7A8AF;
+  --color-strawberry-400: #F46F7A;
+  --color-strawberry-500: #E9434A;
+  --color-strawberry-600: #D92F38;
+  --color-strawberry-700: #B91F2A;
+  --color-strawberry-800: #8F1720;
+  --color-strawberry-900: #641018;
+
+  --color-leaf-50: #F2F8EE;
+  --color-leaf-100: #E4F0DC;
+  --color-leaf-200: #C8E1B8;
+  --color-leaf-300: #A5CC89;
+  --color-leaf-400: #82B85F;
+  --color-leaf-500: #6BAA4A;
+  --color-leaf-600: #528837;
+  --color-leaf-700: #3D6829;
+  --color-leaf-800: #2E4F20;
+  --color-leaf-900: #173B24;
+
+  --color-cream-50: #FFFDF8;
+  --color-cream-100: #FFF8EF;
+  --color-cream-200: #FFF3E6;
+  --color-cream-300: #F7E6CF;
+  --color-cream-400: #EFD6B8;
+
+  --color-blush-50: #FFF7F7;
+  --color-blush-100: #FDECEC;
+  --color-blush-200: #F7C7CA;
+  --color-blush-300: #F2A9AE;
+
+  --color-gold-100: #FFF3C4;
+  --color-gold-300: #F4D06F;
+  --color-gold-500: #E6B64B;
+  --color-gold-700: #B98318;
+
+  --color-ink-900: #173B24;
+  --color-ink-800: #243326;
+  --color-ink-700: #374151;
+  --color-ink-500: #6B7280;
+  --color-ink-300: #D1D5DB;
+
+  --font-heading: "Fraunces", Georgia, serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {
   margin: 0;
-  background-color: var(--color-background);
-  color: var(--color-text);
+  background-color: var(--color-cream-100);
+  color: var(--color-ink-900);
+  font-family: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

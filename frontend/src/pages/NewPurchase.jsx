@@ -4,6 +4,8 @@ import { useToken } from '../context/TokenContext'
 import { createPurchase } from '../api'
 import PurchaseForm from '../components/PurchaseForm'
 import { ArrowLeftIcon } from '../components/Icons'
+import { DecorativeBerry } from '../components/DecorativeBerry'
+import { AppCard } from '../components/AppCard'
 import { SkeletonCard } from '../components/Skeleton'
 
 export default function NewPurchase() {
@@ -25,17 +27,18 @@ export default function NewPurchase() {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={`/${token}`} className="w-11 h-11 flex items-center justify-center -ml-2" aria-label="Zurück">
-          <ArrowLeftIcon className="w-5 h-5" />
+      <div className="mb-5 flex items-center justify-between pt-4">
+        <Link to={`/${token}`} className="flex h-11 w-11 items-center justify-center -ml-2" aria-label="Zurück">
+          <ArrowLeftIcon className="h-5 w-5 text-ink-700" />
         </Link>
-        <h1 className="text-lg font-semibold text-text">Einkauf erfassen</h1>
+        <h1 className="font-heading text-2xl text-leaf-900">Einkauf erfassen</h1>
+        <DecorativeBerry className="h-8 w-8" />
       </div>
 
       {seasonEnded && (
-        <div className="bg-primary/10 border border-primary/20 text-primary text-sm font-medium rounded-xl px-4 py-3 mb-4">
-          Die Saison ist beendet!
-        </div>
+        <AppCard className="mb-4 border-strawberry-200 bg-blush-50 px-4 py-3">
+          <p className="text-sm font-medium text-strawberry-700">Die Saison ist beendet!</p>
+        </AppCard>
       )}
 
       {loading ? (
